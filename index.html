@@ -4,34 +4,59 @@
     <meta charset="UTF-8">
     <title>The Urge of Blood</title>
     <style>
-        body { background-color: #0a0a0a; color: #c0c0c0; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .prescript-box { border: 1px solid #333; padding: 30px; background: #111; width: 450px; text-align: center; box-shadow: 0 0 15px #000; position: relative; }
+        :root {
+            --blood-red: #c0c0c0;
+            --glow: rgba(255, 255, 255, 0);
+        }
+
+        body { 
+            background-color: #0a0a0a; color: var(--blood-red); 
+            font-family: 'Courier New', monospace; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            min-height: 100vh; margin: 0; transition: color 1s ease;
+        }
+
+        .prescript-box { 
+            border: 1px solid var(--blood-red); padding: 30px; background: #111; 
+            width: 450px; text-align: center; 
+            box-shadow: 0 0 15px var(--glow); 
+            position: relative; transition: all 1.5s ease;
+        }
+
         h1 { font-size: 1rem; letter-spacing: 5px; color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; }
         #output { font-size: 1.1rem; margin: 25px 0; min-height: 60px; line-height: 1.5; color: #e0e0e0; }
         
-        button { background: #111; color: #666; border: 1px solid #444; padding: 10px 25px; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
-        button:hover:not(:disabled) { color: #fff; border-color: #fff; background: #1a1a1a; }
-        
-        /* Style for locked button */
-        button:disabled { color: #333; border-color: #222; cursor: not-allowed; }
+        .btn-group { display: flex; flex-direction: column; gap: 10px; align-items: center; }
 
-        .history { margin-top: 20px; width: 450px; font-size: 0.8rem; color: #555; text-align: left; }
-        .history-item { border-left: 2px solid #222; padding-left: 10px; margin-bottom: 8px; }
-        strong { color: #aaa; }
+        button { 
+            background: #111; color: var(--blood-red); border: 1px solid var(--blood-red); 
+            padding: 10px 25px; cursor: pointer; text-transform: uppercase; transition: 0.5s; 
+            width: 80%;
+        }
+        button:hover:not(:disabled) { color: #fff; border-color: #fff; background: #1a1a1a; }
+        button:disabled { opacity: 0.2; cursor: not-allowed; }
+
+        #completeBtn { border-color: #8b0000; color: #ff4d4d; display: none; font-weight: bold; }
+
+        .counter-display { margin-top: 25px; font-size: 0.7rem; opacity: 0.5; letter-spacing: 2px; }
+        strong { color: #fff; }
     </style>
 </head>
-<body onload="checkDailyStatus()">
+<body onload="calculateGlobalCycle()">
 
-<div class="prescript-box">
+<div class="prescript-box" id="mainBox">
     <h1>【 Blood Will 】</h1>
-    <div id="output">The call of power awaits..</div>
-    <button id="callBtn" onclick="receiveWill()">Listen to the call</button>
+    <div id="output">Connecting to the collective will...</div>
+    
+    <div class="btn-group">
+        <button id="callBtn" onclick="receiveWill()">Listen to the call</button>
+        <button id="completeBtn" onclick="completeTask()">Mark as Executed</button>
+    </div>
+
+    <div class="counter-display" id="countView">Cycle Day: --/7</div>
 </div>
 
-<div class="history" id="history-log"></div>
-
 <script>
-// Data remains consistent
 const actionMap = {
     "grind": ["Treasure charts", "Sea Charts", "Towers", "reputation"],
     "kill": ["Minibosses", "Story Bosses", "Sea monsters", "Rivals"],
@@ -39,44 +64,54 @@ const actionMap = {
 };
 const conditions = ["for exactly 1 hour", "for an in-game week", "10 times", "without dying"];
 
-function checkDailyStatus() {
-    const lastDate = localStorage.getItem('bloodWillDate');
-    const today = new Date().toLocaleDateString();
+// This date is the "anchor." Everyone's cycle is calculated from here.
+const GENESIS_DATE = new Date("2024-01-01T00:00:00Z"); 
 
-    // If the date in storage matches today, lock the interface
-    if (lastDate === today) {
-        const savedWill = localStorage.getItem('currentBloodWill');
-        document.getElementById('output').innerHTML = savedWill;
-        lockButton();
+function calculateGlobalCycle() {
+    const now = new Date();
+    // Calculate difference in milliseconds, then convert to days
+    const diff = now - GENESIS_DATE;
+    const totalDaysPassed = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    // Calculate the 1-7 cycle day globally
+    let cycleDay = (totalDaysPassed % 7) + 1;
+    
+    document.getElementById('countView').innerText = `Cycle Day: ${cycleDay}/7`;
+    document.getElementById('output').innerText = "The call of power awaits..";
+
+    // Visual flavor: highlight Day 7 for everyone
+    if (cycleDay === 7) {
+        document.getElementById('mainBox').style.borderColor = "#8b0000";
     }
 }
 
-function lockButton() {
-    const btn = document.getElementById('callBtn');
-    btn.disabled = true;
-    btn.innerText = "The call is silent";
+function receiveWill() {
+    const actions = Object.keys(actionMap);
+    const selectedAction = actions[Math.floor(Math.random() * actions.length)];
+    const targetList = actionMap[selectedAction];
+    const selectedTarget = targetList[Math.floor(Math.random() * targetList.length)];
+    const selectedCondition = conditions[Math.floor(Math.random() * conditions.length)];
+
+    document.getElementById('output').innerHTML = `You must <strong>${selectedAction} ${selectedTarget}</strong> ${selectedCondition}.`;
+    
+    document.getElementById('callBtn').style.display = 'none';
+    document.getElementById('completeBtn').style.display = 'block';
 }
 
-function receiveWill() {
-    const today = new Date().toLocaleDateString();
-
-    // Randomization Logic
-    const actKeys = Object.keys(actionMap);
-    const act = actKeys[Math.floor(Math.random() * actKeys.length)];
-    const tar = actionMap[act][Math.floor(Math.random() * actionMap[act].length)];
-    const cond = conditions[Math.floor(Math.random() * conditions.length)];
-
-    const finalDirective = `You shall <strong>${act}</strong> ${tar} ${cond}.`;
-    
-    // Save to LocalStorage so it persists all day
-    localStorage.setItem('bloodWillDate', today);
-    localStorage.setItem('currentBloodWill', finalDirective);
-
-    // Update main display and lock button
-    document.getElementById('output').innerHTML = finalDirective;
-    lockButton();
+function completeTask() {
+    // In a global sync, completing doesn't advance the day (time does).
+    // So we just reset the UI for the user.
+    document.getElementById('output').innerText = "The blood is satiated... for today.";
+    document.getElementById('callBtn').style.display = 'block';
+    document.getElementById('callBtn').innerText = "Call answered";
+    document.getElementById('callBtn').disabled = true;
+    document.getElementById('completeBtn').style.display = 'none';
 }
 </script>
 
 </body>
 </html>
+
+</body>
+</html>
+
