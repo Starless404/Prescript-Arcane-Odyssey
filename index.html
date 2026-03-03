@@ -11,45 +11,56 @@
             font-family: 'Courier New', monospace; 
             display: flex; flex-direction: column; align-items: center; justify-content: center; 
             min-height: 100vh; margin: 0; padding: 20px;
-            transition: background-color 2s ease; overflow: hidden;
+            transition: background-color 2s ease; overflow-x: hidden;
         }
         .prescript-box { 
             border: 1px solid var(--blood-red); padding: 30px; background: #111; 
             width: 450px; text-align: center; box-shadow: 0 0 15px rgba(255,255,255,0.05); 
         }
-        h1 { font-size: 1rem; letter-spacing: 5px; color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; }
-        #output { font-size: 1.1rem; margin: 25px 0; min-height: 80px; color: #e0e0e0; }
+        h1 { font-size: 1rem; letter-spacing: 5px; color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; }
+        #output { font-size: 1.1rem; margin: 25px 0; min-height: 80px; color: #e0e0e0; line-height: 1.5; }
+        .btn-group { display: flex; flex-direction: column; gap: 10px; align-items: center; }
         button { 
             background: #111; color: var(--blood-red); border: 1px solid var(--blood-red); 
-            padding: 10px 25px; cursor: pointer; text-transform: uppercase; width: 80%;
+            padding: 10px 25px; cursor: pointer; text-transform: uppercase; width: 80%; transition: 0.3s;
         }
+        button:hover:not(:disabled) { color: #fff; border-color: #fff; background: #1a1a1a; }
         button:disabled { opacity: 0.1; cursor: not-allowed; }
         .history-container {
             width: 450px; background: rgba(0, 0, 0, 0.8); border: 1px solid rgba(255, 255, 255, 0.1);
-            margin-top: 25px; padding: 15px; font-size: 0.85rem;
+            margin-top: 25px; padding: 15px; font-size: 0.85rem; color: #fff;
         }
-        .debug-corner { position: fixed; bottom: 15px; right: 15px; }
-        .debug-btn { font-size: 0.6rem; color: #333; border: 1px solid #222; width: auto; cursor: pointer; }
+        .history-title { text-transform: uppercase; letter-spacing: 3px; margin-bottom: 15px; color: #ff4d4d; text-align: center; font-weight: bold; }
+        .history-item { margin-bottom: 8px; border-left: 2px solid #8b0000; padding: 5px 10px; background: rgba(255,255,255,0.05); }
+        .intensity-tag { color: #ff4d4d; font-weight: bold; font-size: 0.8rem; }
+        strong { color: #fff; }
     </style>
 </head>
 <body onload="init()">
 
 <div class="prescript-box">
     <h1>【 Blood Will 】</h1>
-    <div id="output">Initialising...</div>
-    <div id="btnArea">
-        <button id="mainBtn" onclick="handleCall()">Listen</button>
+    <div id="output">Initialising the Call...</div>
+    <div class="btn-group" id="btnArea">
+        <button id="mainBtn" onclick="handleCall()">Listen to the call</button>
     </div>
-    <div id="lockTimer" style="font-size: 0.7rem; color: #444; margin-top: 10px;"></div>
+    <div id="lockTimer" style="font-size: 0.7rem; color: #444; margin-top: 15px;"></div>
 </div>
 
-<div class="history-container" id="historyBox"></div>
-
-<div class="debug-corner">
-    <button class="debug-btn" onclick="manualReset()">[ PURGE DATA ]</button>
+<div class="history-container" id="historyBox">
+    <div class="history-title">Weekly Log</div>
+    <div id="historyList"></div>
 </div>
 
 <script>
+    const actionMap = {
+        "clear": ["Towers", "Treasure charts", "Sea Charts"],
+        "kill": ["Mini Bosses", "Story Bosses", "Rivals"],
+        "hunt": ["Sea Monsters", "Alpha Animals"], 
+        "sink": ["Brigs", "Ketches", "Caravels"],
+        "sail in": ["the Bronze Sea", "the Nimbus Sea", "the Dark Sea"]
+    };
+
     function getUTC() {
         const now = new Date();
         const day = now.getUTCDay(); 
@@ -64,26 +75,34 @@
             const utc = getUTC();
             const lastDate = localStorage.getItem('bloodUTCStepDate');
             
-            // Monday Reset
+            // Automatic Monday Reset (UTC)
             if (utc.step === 1 && lastDate !== utc.dateStr) {
                 localStorage.removeItem('endlessBloodLog');
             }
 
-            const data = JSON.parse(localStorage.getItem('endlessBloodLog')) || { logs: [] };
+            const rawData = localStorage.getItem('endlessBloodLog');
+            const data = rawData ? JSON.parse(rawData) : { logs: [] };
+            
+            // Fix for the 8/7 bug: If data is over 7, trim it immediately
+            if (data.logs.length > 7) {
+                data.logs = data.logs.slice(0, 7);
+                localStorage.setItem('endlessBloodLog', JSON.stringify(data));
+            }
+
             const doneToday = data.logs.some(l => l.date === utc.dateStr);
 
-            // Set Atmosphere
-            const count = Math.min(data.logs.length, 7);
+            // Update Background based on completed count
+            const count = data.logs.length;
             document.body.style.backgroundColor = `rgb(${count * 30}, 0, 0)`;
 
-            // Render Logic
             const output = document.getElementById('output');
             const btn = document.getElementById('mainBtn');
 
             if (doneToday) {
                 output.innerText = "The Call is Silent for today.";
                 btn.disabled = true;
-                btn.innerText = "Locked";
+                btn.innerText = "Wait";
+                document.getElementById('lockTimer').innerText = "The stars reset at 00:00 UTC.";
             } else {
                 output.innerText = "The silence breaks. Will you listen?";
                 btn.disabled = false;
@@ -91,7 +110,7 @@
             }
             renderLog(data);
         } catch (e) {
-            console.error("Recovery mode triggered");
+            // Self-repair if JSON is corrupt
             localStorage.clear();
             location.reload();
         }
@@ -99,14 +118,26 @@
 
     function handleCall() {
         const utc = getUTC();
-        const task = "Execute the designated target."; // Simplified for test
-        document.getElementById('output').innerHTML = `You must <strong>${task}</strong>.`;
-        document.getElementById('btnArea').innerHTML = `<button onclick="completeTask('${task}')">Mark Executed</button>`;
+        const rawData = localStorage.getItem('endlessBloodLog');
+        const data = rawData ? JSON.parse(rawData) : { logs: [] };
+        
+        const scale = 1 + (data.logs.length * 0.5);
+        const categories = Object.keys(actionMap);
+        const action = categories[Math.floor(Math.random() * categories.length)];
+        let targets = [...actionMap[action]];
+        if (action === "hunt" && utc.step >= 4) targets.push("Dark Sea Animals");
+
+        const target = targets[Math.floor(Math.random() * targets.length)];
+        const task = `${action} ${target} ${Math.floor(5 * scale)} times`;
+
+        document.getElementById('output').innerHTML = `<span class="intensity-tag">[DAY ${utc.step}]</span><br>You must <strong>${task}</strong>.`;
+        document.getElementById('btnArea').innerHTML = `<button onclick="completeTask('${task}')">Mark as Executed</button>`;
     }
 
     function completeTask(taskText) {
         const utc = getUTC();
         let data = JSON.parse(localStorage.getItem('endlessBloodLog')) || { logs: [] };
+        
         if (data.logs.length < 7) {
             data.logs.push({ step: utc.step, task: taskText, date: utc.dateStr });
             localStorage.setItem('endlessBloodLog', JSON.stringify(data));
@@ -116,13 +147,18 @@
     }
 
     function renderLog(data) {
-        const box = document.getElementById('historyBox');
-        box.innerHTML = data.logs.length ? data.logs.map(l => `<div>Step ${l.step}: ${l.task}</div>`).join('') : "No offerings.";
-    }
+        const list = document.getElementById('historyList');
+        const dayLabels = ["", "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+        
+        if (data.logs.length === 0) {
+            list.innerHTML = "<div style='text-align:center; opacity:0.3;'>No offerings recorded.</div>";
+            return;
+        }
 
-    function manualReset() {
-        localStorage.clear();
-        location.reload();
+        list.innerHTML = data.logs
+            .sort((a, b) => a.step - b.step)
+            .map(l => `<div class="history-item">${dayLabels[l.step]}: <span>${l.task}</span></div>`)
+            .join('');
     }
 </script>
 </body>
