@@ -3,29 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Urge of Blood</title>
+    <title>The Urge of Blood: Execution Scale</title>
     <style>
         :root {
             --blood-red: #c0c0c0;
-            --glow: rgba(255, 255, 255, 0);
+            --history-text: #ffffff; 
         }
 
         body { 
-            background-color: #0a0a0a; color: var(--blood-red); 
+            background-color: #000000; color: var(--blood-red); 
             font-family: 'Courier New', monospace; 
             display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            min-height: 100vh; margin: 0; transition: color 1s ease;
+            min-height: 100vh; margin: 0; padding: 20px;
+            transition: background-color 1.5s ease;
+            overflow-x: hidden;
         }
 
         .prescript-box { 
             border: 1px solid var(--blood-red); padding: 30px; background: #111; 
             width: 450px; text-align: center; 
-            box-shadow: 0 0 15px var(--glow); 
-            position: relative; transition: all 1.5s ease;
+            box-shadow: 0 0 15px rgba(255,255,255,0.05); 
+            position: relative;
+            margin-bottom: 25px;
         }
 
         h1 { font-size: 1rem; letter-spacing: 5px; color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; }
-        #output { font-size: 1.1rem; margin: 25px 0; min-height: 60px; line-height: 1.5; color: #e0e0e0; }
+        #output { font-size: 1.1rem; margin: 25px 0; min-height: 80px; line-height: 1.5; color: #e0e0e0; }
         
         .btn-group { display: flex; flex-direction: column; gap: 10px; align-items: center; }
 
@@ -35,102 +38,173 @@
             width: 80%;
         }
         button:hover:not(:disabled) { color: #fff; border-color: #fff; background: #1a1a1a; }
-        button:disabled { opacity: 0.2; cursor: not-allowed; }
+        button:disabled { opacity: 0.2; cursor: not-allowed; border-color: #333; color: #444; }
 
         #completeBtn { border-color: #8b0000; color: #ff4d4d; display: none; font-weight: bold; }
 
-        .counter-display { margin-top: 25px; font-size: 0.7rem; opacity: 0.5; letter-spacing: 2px; }
+        .counter-display { margin-top: 25px; font-size: 0.7rem; opacity: 0.5; letter-spacing: 2px; display: flex; justify-content: space-around; width: 100%; }
+        
+        .history-container {
+            width: 450px; background: rgba(0, 0, 0, 0.8); border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px; padding: 15px; font-size: 0.85rem; color: var(--history-text);
+        }
+        .history-title { text-transform: uppercase; letter-spacing: 3px; margin-bottom: 15px; color: #ff4d4d; text-align: center; font-weight: bold; }
+        .history-item { margin-bottom: 8px; border-left: 2px solid #8b0000; padding: 5px 10px; background: rgba(255,255,255,0.05); }
+
+        .intensity-tag { color: #ff4d4d; font-weight: bold; font-size: 0.8rem; }
+        .utc-label { font-size: 0.6rem; color: #444; margin-top: 10px; text-transform: uppercase; }
         strong { color: #fff; }
     </style>
 </head>
-<body onload="calculateGlobalCycle()">
+<body onload="init()">
 
 <div class="prescript-box" id="mainBox">
     <h1>【 Blood Will 】</h1>
-    <div id="output">Connecting to the collective will...</div>
+    <div id="output">Syncing with UTC...</div>
     
     <div class="btn-group">
-        <button id="callBtn" onclick="receiveWill()">Listen to the call</button>
+        <button id="callBtn" onclick="handleCall()">Listen to the call</button>
         <button id="completeBtn" onclick="completeTask()">Mark as Executed</button>
+        <div id="lockTimer" style="font-size: 0.7rem; color: #666; margin-top: 10px;"></div>
     </div>
 
-    <div class="counter-display" id="countView">Cycle Day: --/7</div>
+    <div class="counter-display">
+        <span id="stepDisplay">WEEKLY PROGRESS: 0/7</span>
+        <span id="intensityView">STRENGTH: 1.0x</span>
+    </div>
+    <div class="utc-label" id="utcLabel">UTC TIME</div>
+</div>
+
+<div class="history-container">
+    <div class="history-title">Weekly Log</div>
+    <div id="historyList"></div>
 </div>
 
 <script>
-    // Configuration Data
     const actionMap = {
-        "grind": ["Treasure charts", "Sea Charts", "Towers", "reputation"],
-        "kill": ["Minibosses", "Story Bosses", "Sea monsters", "Rivals"],
+        "clear": ["Towers", "Treasure charts", "Sea Charts"],
+        "kill": ["Mini Bosses", "Story Bosses", "Rivals"],
+        "hunt": ["Sea Monsters", "Alpha Animals"], 
+        "sink": ["Brigs", "Ketches", "Caravels"],
         "sail in": ["the Bronze Sea", "the Nimbus Sea", "the Dark Sea"]
     };
-    const conditions = ["for exactly 1 hour", "for an in-game week", "10 times", "without dying"];
 
-    // The Global Anchor Date (Everyone's Day 1 was Jan 1, 2024)
-    const GENESIS_DATE = new Date("2024-01-01T00:00:00Z"); 
-
-    function calculateGlobalCycle() {
+    function getUTCInfo() {
         const now = new Date();
-        const diff = now - GENESIS_DATE;
-        const totalDaysPassed = Math.floor(diff / (1000 * 60 * 60 * 24));
-        
-        // Calculate the 1-7 day cycle globally
-        const globalCycleDay = (totalDaysPassed % 7) + 1;
-        
-        document.getElementById('countView').innerText = `Cycle Day: ${globalCycleDay}/7`;
-        
-        // Check if user has already finished a task for THIS specific total day
-        const lastDoneDay = localStorage.getItem('lastCompletedTotalDay');
-        
-        if (lastDoneDay == totalDaysPassed) {
-            showSatiatedState();
-        } else {
-            document.getElementById('output').innerText = "The call of power awaits..";
-            document.getElementById('callBtn').style.display = 'block';
-            document.getElementById('callBtn').disabled = false;
-            document.getElementById('callBtn').innerText = "Listen to the call";
+        const day = now.getUTCDay(); // 0-6
+        const dateStr = now.getUTCFullYear() + "-" + (now.getUTCMonth()+1) + "-" + now.getUTCDate();
+        const step = day === 0 ? 7 : day;
+        return { step, dateStr, fullTime: now.toUTCString() };
+    }
+
+    function init() {
+        const utc = getUTCInfo();
+        const lastExecutedDate = localStorage.getItem('bloodUTCStepDate');
+        document.getElementById('utcLabel').innerText = "UTC: " + utc.fullTime;
+
+        // Reset on Monday UTC
+        if (utc.step === 1 && lastExecutedDate !== utc.dateStr) {
+            localStorage.removeItem('endlessBloodLog');
         }
 
-        // Visual cue for the final day of the cycle
-        if (globalCycleDay === 7) {
-            document.getElementById('mainBox').style.borderColor = "#8b0000";
+        renderHistory();
+        
+        const data = JSON.parse(localStorage.getItem('endlessBloodLog')) || { logs: [] };
+        const alreadyDoneToday = data.logs.some(log => log.date === utc.dateStr);
+
+        updateAtmosphere(data.logs.length);
+
+        if (alreadyDoneToday) {
+            lockInterface();
         } else {
-            document.getElementById('mainBox').style.borderColor = "var(--blood-red)";
+            unlockInterface();
         }
     }
 
-    function receiveWill() {
-        const actions = Object.keys(actionMap);
-        const selectedAction = actions[Math.floor(Math.random() * actions.length)];
-        const targetList = actionMap[selectedAction];
-        const selectedTarget = targetList[Math.floor(Math.random() * targetList.length)];
-        const selectedCondition = conditions[Math.floor(Math.random() * conditions.length)];
+    function lockInterface() {
+        document.getElementById('output').innerText = "The blood is sated for this UTC window.";
+        document.getElementById('callBtn').disabled = true;
+        document.getElementById('callBtn').innerText = "Access Denied";
+        document.getElementById('lockTimer').innerText = "Next window opens at 00:00 UTC.";
+    }
 
-        document.getElementById('output').innerHTML = `You must <strong>${selectedAction} ${selectedTarget}</strong> ${selectedCondition}.`;
+    function unlockInterface() {
+        document.getElementById('output').innerText = "A new day has arrived. The call is waiting...";
+        document.getElementById('callBtn').disabled = false;
+        document.getElementById('callBtn').innerText = "Listen to the call";
+        document.getElementById('lockTimer').innerText = "";
+    }
+
+    function updateAtmosphere(completedCount) {
+        // Background scales based strictly on how many tasks are in the history log
+        const intensity = 1 + (completedCount * 0.5);
+        const redValue = Math.min(completedCount * 30, 255); 
         
+        document.body.style.backgroundColor = `rgb(${redValue}, 0, 0)`;
+        document.getElementById('intensityView').innerText = `STRENGTH: ${intensity.toFixed(1)}x`;
+        document.getElementById('stepDisplay').innerText = `WEEKLY PROGRESS: ${completedCount}/7`;
+    }
+
+    function handleCall() {
+        const utc = getUTCInfo();
+        const data = JSON.parse(localStorage.getItem('endlessBloodLog')) || { logs: [] };
+        const scale = 1 + (data.logs.length * 0.5);
+        
+        const scaledRand = (min, max) => Math.floor((Math.random() * (max - min + 1) + min) * scale);
+
+        const categories = Object.keys(actionMap);
+        const action = categories[Math.floor(Math.random() * categories.length)];
+        let targets = [...actionMap[action]];
+        if (action === "hunt" && utc.step >= 4) targets.push("Dark Sea Animals");
+
+        const target = targets[Math.floor(Math.random() * targets.length)];
+        let condition = "";
+
+        if (action === "hunt" || action === "sink") {
+            condition = Math.random() > 0.5 ? `until you earn ${Math.floor(80 * scale)} reputation` : `${scaledRand(5, 10)} times`;
+        } else if (action === "kill") {
+            condition = Math.random() > 0.6 ? `${scaledRand(1, 2)} times without dying` : `${scaledRand(3, 5)} times`;
+        } else {
+            condition = `${scaledRand(2, 4)} times`;
+        }
+
+        const task = `${action} ${target} ${condition}`;
+        document.getElementById('output').innerHTML = `<span class="intensity-tag">[DAY ${utc.step} CALLED]</span><br>You must <strong>${task}</strong>.`;
+        
+        window.activeTask = { step: utc.step, task: task, date: utc.dateStr };
         document.getElementById('callBtn').style.display = 'none';
         document.getElementById('completeBtn').style.display = 'block';
     }
 
     function completeTask() {
-        const now = new Date();
-        const diff = now - GENESIS_DATE;
-        const totalDaysPassed = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-        // Save progress to local storage tied to the current day
-        localStorage.setItem('lastCompletedTotalDay', totalDaysPassed);
+        let data = JSON.parse(localStorage.getItem('endlessBloodLog')) || { logs: [] };
+        data.logs.push(window.activeTask);
+        localStorage.setItem('endlessBloodLog', JSON.stringify(data));
+        localStorage.setItem('bloodUTCStepDate', window.activeTask.date);
         
-        showSatiatedState();
+        document.getElementById('completeBtn').style.display = 'none';
+        document.getElementById('callBtn').style.display = 'block';
+        init(); // Re-runs atmosphere update with new log length
     }
 
-    function showSatiatedState() {
-        document.getElementById('output').innerText = "The blood is satiated... for today.";
-        document.getElementById('callBtn').style.display = 'block';
-        document.getElementById('callBtn').innerText = "Will Executed";
-        document.getElementById('callBtn').disabled = true;
-        document.getElementById('completeBtn').style.display = 'none';
+    function renderHistory() {
+        const data = JSON.parse(localStorage.getItem('endlessBloodLog')) || { logs: [] };
+        const listDiv = document.getElementById('historyList');
+        listDiv.innerHTML = "";
+        const dayLabels = ["", "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
+        if (data.logs.length > 0) {
+            data.logs.sort((a,b) => a.step - b.step);
+            data.logs.forEach(log => {
+                const item = document.createElement('div');
+                item.className = "history-item";
+                item.innerHTML = `${dayLabels[log.step]}: <span>${log.task}</span>`;
+                listDiv.appendChild(item);
+            });
+        } else {
+            listDiv.innerHTML = "<div style='text-align:center; opacity:0.3;'>The log remains empty.</div>";
+        }
     }
 </script>
-
 </body>
 </html>
