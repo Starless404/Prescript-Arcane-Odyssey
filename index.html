@@ -5,239 +5,124 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Urge of Blood</title>
     <style>
-        :root {
-            --blood-red: #c0c0c0;
-            --history-text: #ffffff; 
-        }
-
+        :root { --blood-red: #c0c0c0; }
         body { 
-            background-color: #000000; color: var(--blood-red); 
+            background-color: #000; color: var(--blood-red); 
             font-family: 'Courier New', monospace; 
             display: flex; flex-direction: column; align-items: center; justify-content: center; 
             min-height: 100vh; margin: 0; padding: 20px;
-            transition: background-color 2s ease;
-            overflow-x: hidden;
+            transition: background-color 2s ease; overflow: hidden;
         }
-
         .prescript-box { 
             border: 1px solid var(--blood-red); padding: 30px; background: #111; 
-            width: 450px; text-align: center; 
-            box-shadow: 0 0 15px rgba(255,255,255,0.05); 
-            margin-bottom: 25px;
+            width: 450px; text-align: center; box-shadow: 0 0 15px rgba(255,255,255,0.05); 
         }
-
-        h1 { font-size: 1rem; letter-spacing: 5px; color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; }
-        #output { font-size: 1.1rem; margin: 25px 0; min-height: 80px; line-height: 1.5; color: #e0e0e0; }
-        
-        .btn-group { display: flex; flex-direction: column; gap: 10px; align-items: center; }
-
+        h1 { font-size: 1rem; letter-spacing: 5px; color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        #output { font-size: 1.1rem; margin: 25px 0; min-height: 80px; color: #e0e0e0; }
         button { 
             background: #111; color: var(--blood-red); border: 1px solid var(--blood-red); 
-            padding: 10px 25px; cursor: pointer; text-transform: uppercase; transition: 0.5s; 
-            width: 80%;
+            padding: 10px 25px; cursor: pointer; text-transform: uppercase; width: 80%;
         }
-        button:hover:not(:disabled) { color: #fff; border-color: #fff; background: #1a1a1a; }
         button:disabled { opacity: 0.1; cursor: not-allowed; }
-
-        #completeBtn { border-color: #8b0000; color: #ff4d4d; display: none; font-weight: bold; }
-
-        .counter-display { margin-top: 25px; font-size: 0.7rem; opacity: 0.5; letter-spacing: 2px; display: flex; justify-content: space-around; width: 100%; }
-        
         .history-container {
             width: 450px; background: rgba(0, 0, 0, 0.8); border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 4px; padding: 15px; font-size: 0.85rem; color: var(--history-text);
+            margin-top: 25px; padding: 15px; font-size: 0.85rem;
         }
-        .history-title { text-transform: uppercase; letter-spacing: 3px; margin-bottom: 15px; color: #ff4d4d; text-align: center; font-weight: bold; }
-        .history-item { margin-bottom: 8px; border-left: 2px solid #8b0000; padding: 5px 10px; background: rgba(255,255,255,0.05); }
-
-        .intensity-tag { color: #ff4d4d; font-weight: bold; font-size: 0.8rem; }
-        
-        /* Debug Button Styling */
-        .debug-corner {
-            position: fixed;
-            bottom: 15px;
-            right: 15px;
-            z-index: 100;
-        }
-        .debug-btn {
-            background: rgba(20, 20, 20, 0.8);
-            border: 1px solid #333;
-            color: #444;
-            padding: 5px 10px;
-            font-size: 0.6rem;
-            width: auto;
-            letter-spacing: 1px;
-            transition: 0.3s;
-        }
-        .debug-btn:hover {
-            border-color: #ff0000;
-            color: #ff0000;
-            background: #000;
-        }
-
-        strong { color: #fff; }
+        .debug-corner { position: fixed; bottom: 15px; right: 15px; }
+        .debug-btn { font-size: 0.6rem; color: #333; border: 1px solid #222; width: auto; cursor: pointer; }
     </style>
 </head>
 <body onload="init()">
+
+<div class="prescript-box">
+    <h1>【 Blood Will 】</h1>
+    <div id="output">Initialising...</div>
+    <div id="btnArea">
+        <button id="mainBtn" onclick="handleCall()">Listen</button>
+    </div>
+    <div id="lockTimer" style="font-size: 0.7rem; color: #444; margin-top: 10px;"></div>
+</div>
+
+<div class="history-container" id="historyBox"></div>
 
 <div class="debug-corner">
     <button class="debug-btn" onclick="manualReset()">[ PURGE DATA ]</button>
 </div>
 
-<div class="prescript-box" id="mainBox">
-    <h1>【 Blood Will 】</h1>
-    <div id="output">Listening...</div>
-    
-    <div class="btn-group">
-        <button id="callBtn" onclick="handleCall()">Listen to the call</button>
-        <button id="completeBtn" onclick="completeTask()">Mark as Executed</button>
-        <div id="lockTimer" style="font-size: 0.7rem; color: #444; margin-top: 10px;"></div>
-    </div>
-
-    <div class="counter-display">
-        <span id="stepDisplay">PROGRESS: 0/7</span>
-        <span id="intensityView">STRENGTH: 1.0x</span>
-    </div>
-</div>
-
-<div class="history-container">
-    <div class="history-title">Weekly Log</div>
-    <div id="historyList"></div>
-</div>
-
 <script>
-    const actionMap = {
-        "clear": ["Towers", "Treasure charts", "Sea Charts"],
-        "kill": ["Mini Bosses", "Story Bosses", "Rivals"],
-        "hunt": ["Sea Monsters", "Alpha Animals"], 
-        "sink": ["Brigs", "Ketches", "Caravels"],
-        "sail in": ["the Bronze Sea", "the Nimbus Sea", "the Dark Sea"]
-    };
-
-    function getUTCInfo() {
+    function getUTC() {
         const now = new Date();
         const day = now.getUTCDay(); 
-        const dateStr = now.getUTCFullYear() + "-" + (now.getUTCMonth()+1) + "-" + now.getUTCDate();
-        const step = day === 0 ? 7 : day;
-        return { step, dateStr };
+        return { 
+            step: day === 0 ? 7 : day, 
+            dateStr: now.getUTCFullYear() + "-" + (now.getUTCMonth()+1) + "-" + now.getUTCDate() 
+        };
     }
 
     function init() {
-        const utc = getUTCInfo();
-        const lastDate = localStorage.getItem('bloodUTCStepDate');
+        try {
+            const utc = getUTC();
+            const lastDate = localStorage.getItem('bloodUTCStepDate');
+            
+            // Monday Reset
+            if (utc.step === 1 && lastDate !== utc.dateStr) {
+                localStorage.removeItem('endlessBloodLog');
+            }
 
-        // Reset on Monday UTC
-        if (utc.step === 1 && lastDate !== utc.dateStr) {
-            localStorage.removeItem('endlessBloodLog');
-        }
+            const data = JSON.parse(localStorage.getItem('endlessBloodLog')) || { logs: [] };
+            const doneToday = data.logs.some(l => l.date === utc.dateStr);
 
-        const data = JSON.parse(localStorage.getItem('endlessBloodLog')) || { logs: [] };
-        const alreadyDoneToday = data.logs.some(log => log.date === utc.dateStr);
+            // Set Atmosphere
+            const count = Math.min(data.logs.length, 7);
+            document.body.style.backgroundColor = `rgb(${count * 30}, 0, 0)`;
 
-        updateAtmosphere(data.logs.length);
-        renderHistory(data);
+            // Render Logic
+            const output = document.getElementById('output');
+            const btn = document.getElementById('mainBtn');
 
-        if (alreadyDoneToday) {
-            lockInterface();
-        } else {
-            unlockInterface();
-        }
-    }
-
-    function lockInterface() {
-        document.getElementById('output').innerText = "The Call is Silent for today.";
-        document.getElementById('callBtn').disabled = true;
-        document.getElementById('callBtn').innerText = "Wait";
-        document.getElementById('lockTimer').innerText = "The stars reset at 00:00 UTC.";
-    }
-
-    function unlockInterface() {
-        document.getElementById('output').innerText = "The silence breaks. Will you listen?";
-        document.getElementById('callBtn').disabled = false;
-        document.getElementById('callBtn').innerText = "Listen to the call";
-        document.getElementById('lockTimer').innerText = "";
-    }
-
-    function updateAtmosphere(count) {
-        const displayCount = Math.min(count, 7);
-        const intensity = 1 + (displayCount * 0.5);
-        const redValue = Math.min(displayCount * 30, 210); 
-        
-        document.body.style.backgroundColor = `rgb(${redValue}, 0, 0)`;
-        document.getElementById('intensityView').innerText = `STRENGTH: ${intensity.toFixed(1)}x`;
-        document.getElementById('stepDisplay').innerText = `PROGRESS: ${displayCount}/7`;
-    }
-
-    function handleCall() {
-        const utc = getUTCInfo();
-        const data = JSON.parse(localStorage.getItem('endlessBloodLog')) || { logs: [] };
-        const scale = 1 + (data.logs.length * 0.5);
-        const scaledRand = (min, max) => Math.floor((Math.random() * (max - min + 1) + min) * scale);
-
-        const categories = Object.keys(actionMap);
-        const action = categories[Math.floor(Math.random() * categories.length)];
-        let targets = [...actionMap[action]];
-        if (action === "hunt" && utc.step >= 4) targets.push("Dark Sea Animals");
-
-        const target = targets[Math.floor(Math.random() * targets.length)];
-        let condition = "";
-
-        if (action === "hunt" || action === "sink") {
-            condition = Math.random() > 0.5 ? `until you earn ${Math.floor(80 * scale)} reputation` : `${scaledRand(5, 10)} times`;
-        } else if (action === "kill") {
-            condition = Math.random() > 0.6 ? `${scaledRand(1, 2)} times without dying` : `${scaledRand(3, 5)} times`;
-        } else {
-            condition = `${scaledRand(2, 4)} times`;
-        }
-
-        const taskText = `${action} ${target} ${condition}`;
-        document.getElementById('output').innerHTML = `<span class="intensity-tag">[CALLING...]</span><br>You must <strong>${taskText}</strong>.`;
-        
-        window.activeTask = { step: utc.step, task: taskText, date: utc.dateStr };
-        document.getElementById('callBtn').style.display = 'none';
-        document.getElementById('completeBtn').style.display = 'block';
-    }
-
-    function completeTask() {
-        let data = JSON.parse(localStorage.getItem('endlessBloodLog')) || { logs: [] };
-        
-        if (data.logs.length >= 7) {
-            init();
-            return;
-        }
-
-        data.logs.push(window.activeTask);
-        localStorage.setItem('endlessBloodLog', JSON.stringify(data));
-        localStorage.setItem('bloodUTCStepDate', window.activeTask.date);
-        
-        document.getElementById('completeBtn').style.display = 'none';
-        document.getElementById('callBtn').style.display = 'block';
-        init(); 
-    }
-
-    function renderHistory(data) {
-        const listDiv = document.getElementById('historyList');
-        listDiv.innerHTML = "";
-        const dayLabels = ["", "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-
-        if (data.logs.length > 0) {
-            data.logs.sort((a,b) => a.step - b.step);
-            data.logs.forEach(log => {
-                const item = document.createElement('div');
-                item.className = "history-item";
-                item.innerHTML = `${dayLabels[log.step]}: <span>${log.task}</span>`;
-                listDiv.appendChild(item);
-            });
-        } else {
-            listDiv.innerHTML = "<div style='text-align:center; opacity:0.3;'>No offerings recorded.</div>";
-        }
-    }
-
-    function manualReset() {
-        if(confirm("Debug: Purge all session data and history?")) {
+            if (doneToday) {
+                output.innerText = "The Call is Silent for today.";
+                btn.disabled = true;
+                btn.innerText = "Locked";
+            } else {
+                output.innerText = "The silence breaks. Will you listen?";
+                btn.disabled = false;
+                btn.innerText = "Listen to the call";
+            }
+            renderLog(data);
+        } catch (e) {
+            console.error("Recovery mode triggered");
             localStorage.clear();
             location.reload();
         }
+    }
+
+    function handleCall() {
+        const utc = getUTC();
+        const task = "Execute the designated target."; // Simplified for test
+        document.getElementById('output').innerHTML = `You must <strong>${task}</strong>.`;
+        document.getElementById('btnArea').innerHTML = `<button onclick="completeTask('${task}')">Mark Executed</button>`;
+    }
+
+    function completeTask(taskText) {
+        const utc = getUTC();
+        let data = JSON.parse(localStorage.getItem('endlessBloodLog')) || { logs: [] };
+        if (data.logs.length < 7) {
+            data.logs.push({ step: utc.step, task: taskText, date: utc.dateStr });
+            localStorage.setItem('endlessBloodLog', JSON.stringify(data));
+            localStorage.setItem('bloodUTCStepDate', utc.dateStr);
+        }
+        location.reload();
+    }
+
+    function renderLog(data) {
+        const box = document.getElementById('historyBox');
+        box.innerHTML = data.logs.length ? data.logs.map(l => `<div>Step ${l.step}: ${l.task}</div>`).join('') : "No offerings.";
+    }
+
+    function manualReset() {
+        localStorage.clear();
+        location.reload();
     }
 </script>
 </body>
